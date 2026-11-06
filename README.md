@@ -1,18 +1,24 @@
 # 哔哩哔哩去广告 · Loon
 
-v4 在三次启动的抓包中拦截了开屏广告接口和素材下载。开屏接口收到的是 `{}`，未收到带 `code: 0` 的空广告列表。v5 改由 Loon 请求脚本返回完整的空开屏响应，包含空的素材列表、展示列表和保留 ID 列表。脚本只处理开屏广告的 list、show 和 brand/list。广告视频路径拦截、开屏活动和首页推荐过滤仍保留。
+v6 恢复经过实机抓包验证的分流拦截。开屏广告配置和已识别的视频素材由 Loon 分流规则拦截，无需远程脚本。飞行模式也能出现的广告由 B 站本机已有内容触发，需要在设备上另行处理。
 
-## 安装与验证
+## 先关闭摇一摇跳转
 
-1. [一键导入 v5](https://www.nsloon.com/openloon/import?plugin=https%3A%2F%2Fraw.githubusercontent.com%2Fzhuchen458%2Fbilibiliads-loon%2Fmain%2FBilibiliAds.plugin%3Frev%3Dv5)，也可以在 Loon 插件页添加下方链接。停用 v4 和主配置中手动添加的开屏 `REJECT-DICT` 规则，以免请求被旧规则提前截断。保留分流模式、MitM 和脚本功能。
-2. 打开 B 站后，在 Loon 查看 `/x/v2/splash/list` 或 `/x/v2/splash/show`。脚本栏应显示 `BilibiliSplashV5`，响应头为 `X-BilibiliAds-Loon: splash-v5`，正文的 `data.list` 或 `data.show` 应为 `[]`。
-3. 确认脚本命中后，在 B 站清理缓存一次，连续冷启动三次，中间无需再次清缓存。
+- B 站「我的 → 设置 → 隐私权限设置」里，如果有「允许哔哩哔哩开屏广告访问传感器」，将它关闭。入口名称可能因版本而异。
+- 如果 iPhone 有「设置 → 隐私与安全性 → 运动与健身 → 限制动作数据」，将哔哩哔哩加入限制名单。
+
+以上设置针对晃动触发的跳转。联网广告由下面的插件处理。
+
+## 安装和验证
+
+1. [一键导入 v6](https://www.nsloon.com/openloon/import?plugin=https%3A%2F%2Fraw.githubusercontent.com%2Fzhuchen458%2Fbilibiliads-loon%2Fmain%2FBilibiliAds.plugin%3Frev%3Dv6)，启用「哔哩哔哩去广告 · 开屏版 v6」，停用旧版。Loon 使用分流模式，并保持 MitM 开启。首页推荐过滤另外需要开启复写。
+2. 联网打开 B 站，在 Loon 请求记录中查看 `app.bilibili.com/x/v2/splash/list` 或 `/show`。命中 v6 的开屏分流规则时，策略为 `REJECT-DICT`，通常返回 `{}`。若仍为 `DIRECT` 并收到广告列表，检查插件和分流模式。
+3. 确认拦截生效后再清 B 站缓存，测试一次断网冷启动。若断网仍展示广告，而你需要清除 App 本机旧数据，可在确认本地下载、草稿及登录资料已处理后，从 iOS 选择「删除 App」并重装。iOS 的「卸载 App」会保留文稿和数据。
 
 ```text
-https://raw.githubusercontent.com/zhuchen458/bilibiliads-loon/main/BilibiliAds.plugin?rev=v5
+https://raw.githubusercontent.com/zhuchen458/bilibiliads-loon/main/BilibiliAds.plugin?rev=v6
 ```
 
-如果仍看到 `{}` 和 `REJECT-DICT`，检查是否还有旧开屏规则。若仍收到原始广告列表，检查 Loon 的脚本执行和下载日志。若已经收到 v5 的空列表但仍出现广告，可在断网状态冷启动一次，判断广告能否在没有新请求的情况下出现。
-
-- [Loon 请求脚本 API](https://nsloon.app/docs/Script/script_api/)
-- [Loon 经典脚本语法](https://nsloon.app/docs/Script/)
+- [Loon HTTP 规则](https://nsloon.app/docs/Rule/http_rule/)
+- [Loon 拒绝策略](https://nsloon.app/docs/Policy/)
+- [Apple 关于删除 App 和卸载 App 的说明](https://support.apple.com/zh-cn/108429)
