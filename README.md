@@ -1,35 +1,31 @@
 # 哔哩哔哩去广告 · Loon
 
-适用于 iPhone 上的哔哩哔哩。实机抓包显示，开屏 `/x/v2/splash/list` 会返回包含京东跳转及摇动参数的广告项。插件对广告预取、展示和品牌开屏直接返回空列表，不依赖解压或解析服务器的大响应。开屏活动接口保留账户状态，只清空活动列表。首页继续按明确的广告标记过滤推广卡片和横幅。
+抓包确认，iPhone 版 B 站会在 `/x/v2/splash/list` 下发京东直跳地址和摇动参数。插件对开屏广告列表、展示列表和品牌开屏返回同结构的空数据，避免继续下载广告配置。v3 使用 Loon 经典复写语法，所有开屏 Mock 数据都在插件里。
 
 ## 安装
 
-1. 使用 Loon **3.5.1 (978)** 或更新版本。
-2. 已安装的用户在 Loon 插件页面手动更新本插件。首次安装时，添加下方远程地址并启用。
-3. 开启复写和 MitM，安装并在 iOS「设置 → 通用 → 关于本机 → 证书信任设置」里完全信任自己生成的 Loon 证书。
-4. 在哔哩哔哩里清理缓存，从多任务界面划掉 App 后重新打开。已有的开屏素材可能来自旧缓存。
+1. 打开 [一键导入 Loon](https://www.nsloon.com/openloon/import?plugin=https%3A%2F%2Fraw.githubusercontent.com%2Fzhuchen458%2Fbilibiliads-loon%2Fmain%2FBilibiliAds.plugin%3Frev%3Dv3)。也可以在 Loon 手动添加下方地址。
+2. 确认插件列表里显示并启用了「哔哩哔哩去广告 · 开屏兼容版 v3」。如果有旧版或同类开屏去广告插件，测试时先停用，避免重复复写。
+3. 开启 Loon 的复写和 MitM。已经能抓到 `app.bilibili.com` 的 HTTPS 响应正文时，证书已对这条流量生效。
+4. 在哔哩哔哩里清理缓存，从多任务界面划掉 App 后重新打开。
 
 ```text
-https://raw.githubusercontent.com/zhuchen458/bilibiliads-loon/main/BilibiliAds.plugin
+https://raw.githubusercontent.com/zhuchen458/bilibiliads-loon/main/BilibiliAds.plugin?rev=v3
 ```
+
+## 确认规则命中
+
+在 Loon 的新请求记录里打开 `app.bilibili.com/x/v2/splash/list` 或 `/x/v2/splash/show`，查看「复写」和响应正文。命中后，`data.list` 或 `data.show` 为 `[]`。如果复写列表为空且仍有原始广告数据，先核对插件名称、启用状态和全局复写开关。若正文已是空列表但仍跳转，保留从冷启动到跳转这段的新记录，便于区分客户端缓存和其他请求。
 
 ## 覆盖范围
 
 | 场景 | 接口 |
 | --- | --- |
-| 开屏广告与外跳配置 | `/x/v2/splash/list`、`/x/v2/splash/show`、`/x/v2/splash/event/list2`、`/x/v2/splash/brand/list` |
-| 首页推荐 | `/x/v2/feed/index` |
+| 开屏广告和外跳配置 | `/x/v2/splash/list`、`/x/v2/splash/show`、`/x/v2/splash/brand/list` |
+| 开屏活动 | `/x/v2/splash/event/list2`，保留账户状态 |
+| 首页推荐 | `/x/v2/feed/index`，仅过滤明确标记的广告 |
 
-规则只匹配 `app.bilibili.com` 和 `app.biliapi.net` 的对应 HTTPS GET 请求。京东域名不在复写或 MitM 范围内。iOS 本地唤起 App 的动作可能没有独立 HTTP 请求，因此插件在 B 站下发广告配置时处理。当前覆盖 JSON 接口，gRPC 和其他广告位需以实际抓包确认。
+只匹配 `app.bilibili.com` 和 `app.biliapi.net` 上列出的 HTTPS 路径。
 
-如果手机仍然能复现摇一摇跳转，导出一次从冷启动到跳转的 Loon 记录，优先保留命中的 `splash` 请求路径和响应正文。分享前请移除 Cookie、Authorization、access_key、设备标识和签名。
-
-## 确认规则命中
-
-在 Loon 请求记录中打开 `app.bilibili.com/x/v2/splash/list` 或 `/x/v2/splash/show`。命中后响应头会出现 `X-BilibiliAds-Loon: splash-v2`，正文对应的广告列表为 `[]`。如果看到原始广告列表，检查插件是否已经更新，复写和 MitM 是否开启，以及是否还有其他插件处理同一开屏接口。
-
-## 参考
-
-- [Loon 复写文档](https://nsloon.app/docs/Rewrite/rewrite_v2/)
-- [公开的 B 站开屏接口结构](https://github.com/Kaangnakamuyi/MisakaMikoto/blob/master/docs/APP_widget/splash.md)
-- [app2smile 的 B 站 JSON 接口和广告卡片参考](https://github.com/app2smile/rules/blob/master/js/bilibili-json.js)
+- [Loon 经典复写文档](https://nsloon.app/docs/Rewrite/)
+- [app2smile 的 B 站广告卡片参考](https://github.com/app2smile/rules/blob/master/js/bilibili-json.js)
