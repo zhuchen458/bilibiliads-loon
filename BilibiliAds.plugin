@@ -1,13 +1,18 @@
 #!name = 哔哩哔哩去广告
-#!desc = 清理 iPhone B 站开屏广告及其摇一摇跳转配置，过滤首页推荐中的已识别广告。
+#!desc = 本地返回空开屏广告列表，拦截摇一摇唤起京东的广告配置，过滤首页推广。
 #!homepage = https://github.com/zhuchen458/bilibiliads-loon
 #!system = iOS
 #!loon_version = 3.5.1(978)
 #!date = 2026-11-06
 
 [Rewrite]
-# 清空开屏广告素材和展示列表，连同广告项内的外跳配置一起移除。
-response if ${url} ~= /^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/splash\/(?:list|show|event\/list2|brand\/list)(?:[?]|$)/ && ${request.method} == "GET" && ${response.status} == 200 then response.json.jq("if type != \"object\" then . elif .code != 0 then . elif (.data | type) == \"array\" then .data = [] elif (.data | type) == \"object\" then .data |= with_entries( if (.key == \"list\" or .key == \"show\" or .key == \"keep_ids\" or .key == \"event_list\" or .key == \"preload\") and (.value | type) == \"array\" then .value = [] elif (.key == \"show\" or .key == \"event_list\" or .key == \"preload\") and (.value | type) == \"object\" then empty else . end ) else . end")
+# 在开屏请求发往服务器前返回空列表，避免加载摇一摇素材和跳转配置。
+response if ${url} ~= /^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/splash\/list(?:[?]|$)/ && ${request.method} == "GET" then response.body.mock("json", `{"code":0,"message":"OK","ttl":1,"data":{"max_time":0,"min_interval":600,"pull_interval":900,"keep_ids":[],"list":[],"show":[],"splash_request_id":""}}`, 200) | response.header.set(["Cache-Control", "X-BilibiliAds-Loon"], ["no-store", "splash-v2"])
+response if ${url} ~= /^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/splash\/show(?:[?]|$)/ && ${request.method} == "GET" then response.body.mock("json", `{"code":0,"message":"OK","ttl":1,"data":{"show":[],"splash_request_id":""}}`, 200) | response.header.set(["Cache-Control", "X-BilibiliAds-Loon"], ["no-store", "splash-v2"])
+response if ${url} ~= /^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/splash\/brand\/list(?:[?]|$)/ && ${request.method} == "GET" then response.body.mock("json", `{"code":0,"message":"OK","ttl":1,"data":{"pull_interval":1800,"forcibly":false,"rule":"","list":[],"preload":[],"has_new_splash_set":false,"new_splash_hash":"","force_show_times":0,"show_hash":"","badge_from":"","query_list":null}}`, 200) | response.header.set(["Cache-Control", "X-BilibiliAds-Loon"], ["no-store", "splash-v2"])
+
+# 保留活动接口的账户状态，仅清空开屏活动列表。
+response if ${url} ~= /^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/splash\/event\/list2(?:[?]|$)/ && ${request.method} == "GET" && ${response.status} == 200 then response.json.jq("if type != \"object\" then . elif .code != 0 or (.data | type) != \"object\" then . elif (.data.event_list | type) == \"array\" then .data.event_list = [] else . end")
 
 # 仅过滤明确标记的推广卡片和横幅广告。
 response if ${url} ~= /^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/feed\/index(?:[?]|$)/ && ${request.method} == "GET" && ${response.status} == 200 then response.json.jq("def marked_ad: .is_ad as $flag | ($flag == true or $flag == 1 or $flag == \"1\") or (.ad_info | type == \"object\" and length > 0) or (.card_type == \"cm_v2\" and (.card_goto | IN(\"ad_web_s\", \"ad_av\", \"ad_web_gif\", \"ad_player\", \"ad_inline_3d\", \"ad_inline_eggs\"))) or (.card_type == \"cm_double_v9\" and .card_goto == \"ad_inline_av\"); if type != \"object\" then . elif .code != 0 or (.data | type) != \"object\" then . elif (.data.items | type) != \"array\" then . else .data.items |= map( if type != \"object\" then . elif marked_ad then empty elif .card_type == \"banner_v8\" and .card_goto == \"banner\" and (.banner_item | type == \"array\" and length > 0) then .banner_item |= map(select(if type == \"object\" then .type != \"ad\" else true end)) | select(.banner_item | length > 0) else . end ) end")
