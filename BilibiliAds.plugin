@@ -1,8 +1,14 @@
-#!name = 哔哩哔哩去广告 · 开屏兼容版 v3
-#!desc = 本地返回空开屏广告列表，拦截摇一摇唤起京东的广告配置，过滤首页推广。
+#!name = 哔哩哔哩去广告 · 开屏版 v4
+#!desc = 清空开屏广告配置，拦截开屏广告接口和视频素材，过滤首页推广。
 #!homepage = https://github.com/zhuchen458/bilibiliads-loon
 #!system = iOS
 #!date = 2026-11-06
+
+[Rule]
+# 开屏复写未执行时，阻止这三个接口返回原始广告数据。
+URL-REGEX,^https://app\.(?:bilibili\.com|biliapi\.net)(?::443)?/x/v2/splash/(?:list|show|brand/list)(?:[?]|$),REJECT-DICT
+# 仅拦截抓包确认的开屏广告视频路径，不封整个 CDN。
+URL-REGEX,^https://upos-sz-static\.bilivideo\.com(?::443)?/ssaxcode/[^/?]{2}/[^/?]{2}/[^/?]+\.mp4(?:[?]|$),REJECT
 
 [Rewrite]
 # 使用经典 Rewrite 语法。Base64 内联 JSON 避免引号转义和额外下载。
@@ -17,4 +23,4 @@
 ^https:\/\/app\.(?:bilibili\.com|biliapi\.net)(?::443)?\/x\/v2\/feed\/index(?:\?|$) response-body-json-jq 'def marked_ad: .is_ad as $flag | ($flag == true or $flag == 1 or $flag == "1") or (.ad_info | type == "object" and length > 0) or (.card_type == "cm_v2" and (.card_goto | IN("ad_web_s", "ad_av", "ad_web_gif", "ad_player", "ad_inline_3d", "ad_inline_eggs"))) or (.card_type == "cm_double_v9" and .card_goto == "ad_inline_av"); if type != "object" then . elif .code != 0 or (.data | type) != "object" then . elif (.data.items | type) != "array" then . else .data.items |= map( if type != "object" then . elif marked_ad then empty elif .card_type == "banner_v8" and .card_goto == "banner" and (.banner_item | type == "array" and length > 0) then .banner_item |= map(select(if type == "object" then .type != "ad" else true end)) | select(.banner_item | length > 0) else . end ) end'
 
 [MitM]
-hostname = app.bilibili.com, app.biliapi.net
+hostname = app.bilibili.com, app.biliapi.net, upos-sz-static.bilivideo.com
